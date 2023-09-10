@@ -1,0 +1,191 @@
+---
+
+---
+
+Part 1: Tidy and get ready for Students dataset 
+want NA in both waves or NA+Dont Know or Dont Know+NA or Dont Know in both 
+
+```{r}
+xx1=is.na(Student_race_all_result$Wave1)&is.na(Student_race_all_result$Wave2)
+subset1=Student_race_all_result[xx1,]   
+'This is the response from those have NA values in both Waves'
+```
+
+
+```{r}
+xx2=is.na(Student_race_all_result$Wave1)
+xx2
+subset2=Student_race_all_result[xx2,] 
+subset2=subset2[subset2$Wave2=='Dont_Know',]
+subset2=unique(subset2)
+subset2                                  
+'This is the subset of students whose response is NA in Wave1 and Dont Know in Wave2'
+```
+
+```{r}
+xx3=is.na(Student_race_all_result$Wave2)
+xx3
+subset3=Student_race_all_result[xx3,] 
+subset3=subset3[subset3$Wave1=='Dont_Know',]
+subset3=unique(subset3)
+subset3
+'This is the subset if students whose response is Dont Know in Wave1 and NA in Wave2'
+```
+
+```{r}
+
+subset4=Student_race_all_result[Student_race_all_result$Wave1=='Dont_Know'&Student_race_all_result$Wave2=='Dont_Know',] 
+
+subset4=unique(subset4)
+subset4
+```
+Then we can combine these four situations together and form the final dataset for students with missing responses.
+
+```{r}
+Need_TR_Students=rbind(subset1,subset2,subset3,subset4)
+Need_TR_Students
+'Then for final check, we want to remove any response with a missing Student ID'
+
+logic=is.na(Need_TR_Students$Student_ID)
+sum(logic)
+Need_TR_Students=Need_TR_Students[!logic,]
+Need_TR_Students
+'Then this is the final version for students who need TR responses to help us identify their races'
+```
+
+
+
+
+Part 2: Organize TR Responses and get ready for TR dataset
+
+```{r}
+sos.wave1_2
+'begin with TR, teachers responses on students'
+
+sos.wave1_2_TR<-select(sos.wave1_2,STUDENT_ID,starts_with('TR_Race')) %>%
+  select(STUDENT_ID,ends_with('W2')) %>%
+  rename_with(~str_remove(., '_W2')) %>%
+  mutate(Wave = 2)
+
+
+
+sos.wave1_2_TR_long <- select(sos.wave1_2, STUDENT_ID, starts_with('TR_Race')) %>%
+  select(STUDENT_ID,ends_with('W1')) %>%
+rename_with(~str_remove(., '_W1')) %>%
+mutate(Wave = 1) %>%
+bind_rows(sos.wave1_2_TR)
+
+
+
+sos.wave1_2_TR_long<-unique(sos.wave1_2_TR_long)
+
+
+sos.wave1_2_TR_long
+```
+
+
+
+```{r}
+colnames(sos.wave1_2_TR_long)<-c('Student_ID','Asian','Black','Haitian','Hispanic','Native','Pac_Island','White','Other','Other_Specify','Wave')
+
+sos.wave1_2_TR_long
+
+'I observe that there are only a few cases which teachers identify students as Haitian but did not label them as Haitian in the survey'
+'So need to make one more step of transformation and tidy'
+
+sos.wave1_2_TR_long<-sos.wave1_2_TR_long %>%
+  mutate(Haitian=ifelse(Other_Specify=='Haitian',1,0))
+sos.wave1_2_TR_long
+'Then this is the final version of teachers response on students dataset'
+'We will start applying different approach through the catacode function'
+```
+
+
+Part 3: Utilize the Multiple Method
+
+```{r}
+TR_race_MU<-catacode(sos.wave1_2_TR_long, id = Student_ID, approach = "multiple", Asian:Other, time=Wave,new.name = "Race_Ethnicity")
+
+TR_race_MU
+```
+
+Then we want to match teachers responses with those whose self-identifications are missing
+
+```{r}
+Need_TR_Students
+
+Merge_Mu=merge(x=TR_race_MU,y=Need_TR_Students,by='Student_ID')
+Merge_Mu
+```
+300 among 321 students find corresponding TR responses on them.
+
+
+Part 4: Summarize the result
+```{r}
+Merge_MU_Summary<-Merge_Mu %>%
+  group_by(Race_Ethnicity) %>%
+  summarize(count=n())
+
+Merge_MU_Summary
+
+```
+
+Part 5: Utilize Priority Approach
+```{r}
+TR_race_P<-catacode(sos.wave1_2_TR_long, id = Student_ID, approach = "priority", Asian:Other,priority = c('Hispanic','Haitian'), time=Wave,new.name = "Race_Ethnicity")
+
+TR_race_P
+```
+
+Merge the responses
+```{r}
+Merge_P=merge(x=TR_race_P,y=Need_TR_Students,by='Student_ID')
+Merge_P
+```
+
+Part 6: Summarize the result
+```{r}
+Merge_P_Summary<-Merge_P %>%
+  group_by(Race_Ethnicity) %>%
+  summarize(count=n())
+
+Merge_P_Summary
+
+```
+
+
+Part 7: Utilize the Mode Approach
+
+```{r}
+TR_race_M<-catacode(sos.wave1_2_TR_long, id = Student_ID, approach = "mode", Asian:Other,priority = c('Hispanic','Haitian'), time=Wave,new.name = "Race_Ethnicity")
+
+colnames(TR_race_M)=c('Student_ID','Race_Ethnicity')
+TR_race_M
+```
+Then merge
+```{r}
+Merge_M=merge(x=TR_race_M,y=Need_TR_Students,by='Student_ID')
+Merge_M
+```
+
+Part 8: Summarize the result
+```{r}
+Merge_M_Summary<-Merge_M %>%
+  group_by(Race_Ethnicity) %>%
+  summarize(count=n())
+
+Merge_M_Summary
+```
+
+
+Comparison
+```{r}
+
+Merge_MU_Summary
+
+Merge_P_Summary
+
+
+Merge_M_Summary
+```
+

@@ -1,0 +1,299 @@
+'1) Import Data into R
+
+
+```{r}
+library(haven)
+library(tidyverse)
+```
+
+```{r}
+sos.wave1_2 <- read_sav("SOS_Wave1_2.sav")
+sos.wave1_2
+```
+Start with analyzing teacher's response
+```{r}
+sos.wave1_2_T<-select(sos.wave1_2,TEACHER_ID,starts_with('T_Race')) %>%
+  select(TEACHER_ID,ends_with('W2')) %>%
+  rename_with(~str_remove(., '_W2')) %>%
+  mutate(Wave = 2)
+
+
+
+sos.wave1_2_T_long <- select(sos.wave1_2, TEACHER_ID, starts_with('T_Race')) %>%
+  select(TEACHER_ID,ends_with('W1')) %>%
+rename_with(~str_remove(., '_W1')) %>%
+mutate(Wave = 1) %>%
+bind_rows(sos.wave1_2_T)
+
+
+
+sos.wave1_2_T_long<-unique(sos.wave1_2_T_long)
+"I observe that lots of participants sumbit multiple responses"
+
+sos.wave1_2_T_long
+"This is the final version for our long dataset"
+```
+
+'Then check T_Race_Other-Specificy this column, it seems like all teacher respodents correctly identify their races even though they put speicfic race other answers in the survey'
+
+```{r}
+
+
+
+colnames(sos.wave1_2_T_long)<-c('Teacher_ID','Asian','Black','Native','Pac_Island','Haitian','Hispanic','White','Other','Other_Specify','Wave')
+
+sos.wave1_2_T_long
+```
+Part 1----Teacher's Response Multiple Approach
+
+```{r}
+Teacher_race_MU<-catacode(sos.wave1_2_T_long, id = Teacher_ID, approach = "multiple", Asian:Other, time=Wave,new.name = "Race_Ethnicity")
+'This shows the Race_Ethnicity for each participant based on multiple measurement'
+
+Teacher_race_MU
+
+```
+
+'Generate visualizations based on the result'
+```{r}
+Teacher_race_MU_Summary<-Teacher_race_MU %>%
+  group_by(Race_Ethnicity) %>%
+  summarize(count=n())
+
+Teacher_race_MU_Summary
+
+Teacher_race_MU_plot<-ggplot(aes(x=Race_Ethnicity,y=count),data=Teacher_race_MU_Summary)+geom_bar(stat='identity',aes(fill=Race_Ethnicity))+geom_text(aes(label=count,vjust=-4))+scale_y_continuous(limits = c(0,50))
+
+Teacher_race_MU_plot
+```
+
+Part 2----Teacher's Response Priority Approach
+```{r}
+Teacher_race_P<-catacode(sos.wave1_2_T_long, id = Teacher_ID, approach = "priority", Asian:Other,priority = c('Hispanic','Haitian'), time=Wave,new.name = "Race_Ethnicity")
+
+
+Teacher_race_P
+```
+'Generate visualizations based on the result'
+```{r}
+Teacher_race_P_Summary<-Teacher_race_P %>%
+  group_by(Race_Ethnicity) %>%
+  summarize(count=n())
+
+Teacher_race_P_Summary
+
+Teacher_race_P_plot<-ggplot(aes(x=Race_Ethnicity,y=count),data=Teacher_race_P_Summary)+geom_bar(stat='identity',aes(fill=Race_Ethnicity))+geom_text(aes(label=count,vjust=-4))+scale_y_continuous(limits = c(0,50))
+
+Teacher_race_P_plot
+```
+
+Part 3---Teacher's Response Mode Approach
+```{r}
+Teacher_race_M<-catacode(sos.wave1_2_T_long, id = Teacher_ID, approach = "mode", Asian:Other,priority = c('Hispanic','Haitian'), time=Wave,new.name = "Race_Ethnicity")
+
+
+colnames(Teacher_race_M)<-c('Teacher_ID','Race_Ethnicity')
+```
+
+'Generate visualizations based on the result'
+```{r}
+Teacher_race_M_Summary<-Teacher_race_M %>%
+  group_by(Race_Ethnicity) %>%
+  summarize(count=n())
+
+Teacher_race_M_Summary
+
+Teacher_race_M_plot<-ggplot(aes(x=Race_Ethnicity,y=count),data=Teacher_race_M_Summary)+geom_bar(stat='identity',aes(fill=Race_Ethnicity))+geom_text(aes(label=count,vjust=-4))+scale_y_continuous(limits = c(0,50))
+
+Teacher_race_M_plot
+```
+Addtional Comparison: Compare the result, using three different approaches
+```{r}
+Teacher_race_MU_Summary2<-Teacher_race_MU_Summary%>%
+  mutate(Approach='Multiple')
+
+Teacher_race_P_Summary2<-Teacher_race_P_Summary%>%
+  mutate(Approach='Priority')
+
+Teacher_race_M_Summary2<-Teacher_race_M_Summary%>%
+  mutate(Approach='Mode')
+
+Teacher_combined=rbind(Teacher_race_MU_Summary2,Teacher_race_P_Summary2,Teacher_race_M_Summary2)
+Teacher_combined
+```
+
+```{r}
+Teacher_combined_graph=ggplot(Teacher_combined,aes(x=Race_Ethnicity,y=count))+geom_bar(stat = 'identity',aes(fill=Race_Ethnicity))+facet_wrap(.~Approach)+geom_text(aes(label=count,vjust=-4))+scale_y_continuous(limits = c(0,50))
+Teacher_combined_graph
+
+
+```
+
+
+
+
+Part 4---Students Response Multiple Approach
+
+Start with subtracting students' responses
+```{r}
+sos.wave1_2_ST<-select(sos.wave1_2,STUDENT_ID,starts_with('ST_Race')) %>%
+  select(STUDENT_ID,ends_with('W2')) %>%
+  rename_with(~str_remove(., '_W2')) %>%
+  mutate(Wave = 2)
+
+
+
+sos.wave1_2_ST_long <- select(sos.wave1_2, STUDENT_ID, starts_with('ST_Race')) %>%
+  select(STUDENT_ID,ends_with('W1')) %>%
+rename_with(~str_remove(., '_W1')) %>%
+mutate(Wave = 1) %>%
+bind_rows(sos.wave1_2_ST)
+
+
+
+sos.wave1_2_ST_long<-unique(sos.wave1_2_ST_long)
+"I observe that lots of participants sumbit multiple responses"
+
+colnames(sos.wave1_2_ST_long)<-c('Student_ID','Asian','Black','Native','Other_Specify','Other','Pac_Island','White','Dont_Know','Wave')
+
+sos.wave1_2_ST_long
+
+'Then,for double check, I checked students responses on Race_Other_Specify this column. Considering their young age, they may encounter some difficulties and i want to make sure they didnt put any provided race values in this column'
+
+
+'For Hispanic ones, they are labelled as 0 in Others Specify, for Haitian ones, they are labelled as 1, for Whitrs, they are labelled as 2'
+ sos.wave1_2_ST_long<-sos.wave1_2_ST_long %>%
+  mutate(Other_Specify=ifelse(Other_Specify=='hispanic'|Other_Specify=='Spanish'|Other_Specify=='spanish',0,Other_Specify)) %>%
+  mutate(Other_Specify=ifelse(Other_Specify=='haitian'|Other_Specify=='Haitian'|Other_Specify=='haiitan',1,Other_Specify)) %>%
+   mutate(Other_Specify=ifelse(Other_Specify=='white'|Other_Specify=='White',2,Other_Specify))
+ 
+
+
+
+'Then make sure these values are reflected in their original columns'
+'because in the original survey, for students verion, Hispanic and Haitian is not provided, so I create two new columns to record them'
+sos.wave1_2_ST_long2<-sos.wave1_2_ST_long %>%
+  mutate(Hispanic=ifelse(Other_Specify==0,1,0)) %>%
+  mutate(Haitian=ifelse(Other_Specify==1,1,0)) %>%
+  mutate(White=ifelse(Other_Specify==2,1,0)) %>%
+  select(-Other_Specify)
+
+sos.wave1_2_ST_long2
+'This is the final version for students responses dataset'
+```
+
+
+Students Response Multiple Approach
+```{r}
+Student_race_MU<-catacode(sos.wave1_2_ST_long2, id = Student_ID, approach = "multiple", c(Asian:Dont_Know,Hispanic:Haitian), new.name = "Race_Ethnicity")
+
+Student_race_MU
+
+
+Student_race_MU_summary<-Student_race_MU %>%
+  group_by(Race_Ethnicity) %>%
+  summarize(count=n())
+
+Student_race_MU_summary
+
+Student_race_MU_plot<-ggplot(aes(x=Race_Ethnicity,y=count),data=Student_race_MU_summary)+geom_bar(stat='identity',aes(fill=Race_Ethnicity))+geom_text(aes(label=count,vjust=-4))+scale_y_continuous(limits = c(0,80))
+
+Student_race_MU_plot
+```
+
+Part 5: 
+Students Response Priority Approach
+```{r}
+Student_race_P<-catacode(sos.wave1_2_ST_long2, id = Student_ID, approach = "priority", c(Asian:Dont_Know,Hispanic:Haitian),priority = c('Hispanic','Haitian'), new.name = "Race_Ethnicity")
+
+Student_race_P
+
+
+Student_race_P_summary<-Student_race_P %>%
+  group_by(Race_Ethnicity) %>%
+  summarize(count=n())
+
+Student_race_P_summary
+
+Student_race_P_plot<-ggplot(aes(x=Race_Ethnicity,y=count),data=Student_race_P_summary)+geom_bar(stat='identity',aes(fill=Race_Ethnicity))+geom_text(aes(label=count,vjust=-4))+scale_y_continuous(limits = c(0,80))
+
+Student_race_P_plot
+```
+
+Part 6: Students rsponse Priority Approach
+```{r}
+Student_race_M<-catacode(sos.wave1_2_ST_long2, id = Student_ID, approach = "mode", c(Asian:Dont_Know,Hispanic:Haitian),priority = c('Hispanic','Haitian'), new.name = "Race_Ethnicity")
+
+colnames(Student_race_M)<-c('Student_ID','Race_Ethnicity')
+
+
+Student_race_M_summary<-Student_race_M %>%
+  group_by(Race_Ethnicity) %>%
+  summarize(count=n())
+
+Student_race_M_summary
+
+Student_race_M_plot<-ggplot(aes(x=Race_Ethnicity,y=count),data=Student_race_M_summary)+geom_bar(stat='identity',aes(fill=Race_Ethnicity))+geom_text(aes(label=count,vjust=-4))+scale_y_continuous(limits = c(0,80))
+
+Student_race_M_plot
+```
+
+Additional Comparision of students responses
+```{r}
+Student_race_MU_summary
+Student_race_P_summary
+Student_race_M_summary
+
+Student_race_MU_Summary2<-Student_race_MU_summary%>%
+  mutate(Approach='Multiple')
+
+Student_race_P_Summary2<-Student_race_P_summary%>%
+  mutate(Approach='Priority')
+
+Student_race_M_Summary2<-Student_race_M_summary%>%
+  mutate(Approach='Mode')
+
+Student_combined=rbind(Student_race_MU_Summary2,Student_race_P_Summary2,Student_race_M_Summary2)
+Student_combined
+```
+
+```{r}
+Student_combined_graph=ggplot(Student_combined,aes(x=Race_Ethnicity,y=count))+geom_bar(stat = 'identity',aes(fill=Race_Ethnicity))+facet_wrap(.~Approach)+geom_text(aes(label=count,vjust=-4))+scale_y_continuous(limits = c(0,50))
+Student_combined_graph
+
+```
+
+
+
+Part 7: Distribution of Teachers whose answers are different across waves
+```{r}
+Teacher_race_all<-catacode(sos.wave1_2_T_long, id = Teacher_ID, approach = "all", Asian:Other, time=Wave,new.name = "Race_Ethnicity")
+Teacher_race_all_result<-pivot_wider(data=Teacher_race_all,names_from = Wave,values_from = Race_Ethnicity)
+'Change the summary table from long to wide format'
+colnames(Teacher_race_all_result)=c('Teacher_ID','Wave1','Wave2')
+Teacher_race_all_result<-Teacher_race_all_result%>%
+  mutate(same=ifelse(Wave1==Wave2,1,0))
+Teacher_race_all_result
+sum(na.omit(Teacher_race_all_result$same))
+```
+25 among 68 teachers responses are the same across waves
+
+
+
+Part 8: Distribution of Students whose answers are different across waves
+```{r}
+Student_race_all<-catacode(sos.wave1_2_ST_long2, id = Student_ID, approach = "all", c(Asian:Dont_Know,Hispanic:Haitian),time=Wave, new.name = "Race_Ethnicity")
+Student_race_all
+
+Student_race_all_result<-pivot_wider(data=Student_race_all,names_from = Wave,values_from = Race_Ethnicity)
+'Change the summary table from long to wide format'
+colnames(Student_race_all_result)=c('Student_ID','Wave1','Wave2')
+
+Student_race_all_result
+
+Student_race_all_result<-Student_race_all_result%>%
+  mutate(same=ifelse(Wave1==Wave2,1,0))
+Student_race_all_result
+sum(na.omit(Student_race_all_result$same))
+```
+52 among 504 students have the exactly same responses across waves
